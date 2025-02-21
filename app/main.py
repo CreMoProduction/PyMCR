@@ -9,6 +9,12 @@ from app import ( # Import the package-level variables including __version__
     __version__,
     __author__
     ) 
+from app.config.settings import (
+    version,
+    author,
+    date,
+    APP_TITLE, 
+    APP_GEOMETRY)
 from app.gui.main_window import MainWindow
 from app.config.settings import (
     APP_TITLE, 
@@ -18,7 +24,7 @@ from app.config.settings import (
 
 def main():
     root = tk.Tk()
-    root.title(f"{APP_TITLE} v{__version__}")
+    root.title(f"{APP_TITLE} v{version}")
     root.geometry(APP_GEOMETRY)
 
     main_window = MainWindow(root)  # Use a different variable name
@@ -26,3 +32,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

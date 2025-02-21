@@ -1,43 +1,41 @@
 # gui/gui.py
 import tkinter as tk
 from tkinter import Menu, PanedWindow
-#from tkinter import filedialog
-import plotly.graph_objs as go
-import plotly.offline as pyo
-from plotly.subplots import make_subplots
-from utils.file_utils import (
-    read_netcdf
-    )
 from app.gui.gui_callbacks import (
     on_open_click,
     #save_plot_as_image
 )
-import webbrowser
-from tkinterweb import HtmlFrame
-import plotly.io as pio
-
-
-from plotly.subplots import make_subplots
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from PIL import Image, ImageTk
+from app.gui.widgets.tabs import (
+    ClosableTabNotebook,
+    )
+from app.gui.widgets.file_explorer import FileExplorerTab, ButtonFrame
 
 class MainWindow(tk.Frame):
     def __init__(self, root):
         super().__init__(root)
         self.root = root
         self.pack()
+        self.raw_data_overview_var = tk.BooleanVar(value=True)
+        self.raw_data_tab = None
         # self.root.title("My First App")
         # self.root.geometry("400x300")
+        self.create_widgets()
+    
 
+    def create_widgets(self): 
+        self.create_menu()
+        self.create_toolbar()
+        self.create_panned_window()
+        self.create_sidebar_tabs()
+        self.create_plot_tabs()
+        self.create_statusbar()
+
+
+
+    def create_menu(self):
         # Create the menu bar
         self.menu_bar = Menu(self.root)
         self.root.config(menu=self.menu_bar)
-        
         # Create the File menu
         self.file_menu = Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
@@ -50,17 +48,39 @@ class MainWindow(tk.Frame):
         self.options_menu = Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="Options", menu=self.options_menu)
         self.options_menu.add_command(label="Settings", command=self.open_settings)
+        # Create the Window menu
+        self.options_menu = Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Window", menu=self.options_menu)
+        self.options_menu.add_command(label="File Explorer", command=lambda: self.open_raw_data_overview(tab="File Explorer"))
+        self.options_menu.add_command(label="Raw data overview", command=lambda: self.open_raw_data_overview(tab="Raw data overview"))
+        self.options_menu.add_command(label="Retention Time vs. m/z", command=lambda: self.open_raw_data_overview(tab="Retention Time vs. m/z"))
+        # Create the Help menu
+        self.options_menu = Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Help", menu=self.options_menu)
+        self.options_menu.add_command(label="Documentation", command=self.open_settings)
+        self.options_menu.add_command(label="About", command=self.open_settings)
         
-        #=====================================
+
+        
+
+    def create_toolbar(self):
         self.toolbar = tk.Frame(self.root, background="#e8e8e8", height=15)
         self.statusbar = tk.Frame(self.root, background="#e8e8e8", height=15)
         self.main = tk.PanedWindow(self.root, background="#ffffff")
-
         self.toolbar.pack(side="top", fill="x")
         self.statusbar.pack(side="bottom", fill="x")
         self.main.pack(side="top", fill="both", expand=True)
-        #=====================================
+        # add a label to the toolbar
+        self.toolbar_label = tk.Label(self.toolbar, text="toolbar", font=("Arial", 8))
+        self.toolbar_label.pack(side="left", padx=1, pady=1)
         
+
+    def create_statusbar(self):
+        self.statusbar = tk.Label(self.statusbar, text="statusbar", font=("Arial", 8))
+        self.statusbar.pack(side="left", padx=1, pady=1)
+
+
+    def create_panned_window(self):
         # Create the PanedWindow
         self.left_paned_window = PanedWindow(self.main, orient=tk.HORIZONTAL)
         self.left_paned_window.pack(side="left", fill="both", expand=True)
@@ -73,25 +93,94 @@ class MainWindow(tk.Frame):
         # Create vertical PanedWindow in the right frame
         self.right_paned_window = PanedWindow(self.right_frame, orient=tk.VERTICAL)
         self.right_paned_window.pack(fill="both", expand=True)
-        # Create upper and lower frames
-        self.upper_right_frame = tk.Frame(self.right_paned_window, bg="white")
-        self.lower_right_frame = tk.Frame(self.right_paned_window, bg="white")
+
+
+
+    def create_plot_tabs(self):
+        self.plot_tab = ClosableTabNotebook(self.right_paned_window)
+        self.plot_tab.pack(fill="both", expand=True)
+
+        frame1 = tk.Frame(self.plot_tab)
+        label1 = tk.Label(frame1)
+        #label1.pack(padx=1, pady=1)
+        self.create_chromatogram_tab(frame1)
+        self.plot_tab.add(frame1, text="Raw data overview")
+
+        frame1 = tk.Frame(self.plot_tab)
+        label1 = tk.Label(frame1, text="Content of Retention Time vs. m/z")
+        label1.pack(padx=10, pady=10)
+        self.plot_tab.add(frame1, text="Retention Time vs. m/z")
+        
+    def create_sidebar_tabs(self):
+        self.sidebar_tab = ClosableTabNotebook(self.left_frame) # Place it in left_frame directly
+        self.sidebar_tab.pack(fill="both", expand=True)
+        frame1 = tk.Frame(self.sidebar_tab)
+
+        # Create the FileExplorerTab
+        self.file_explorer_tab = FileExplorerTab(self.sidebar_tab, self.sidebar_tab) # Pass the notebook as tab_control
+        self.sidebar_tab.add(self.file_explorer_tab, text="File Explorer")  # Add to the notebook
+
+        # Create the ButtonFrame and pass the FileExplorerTab instance
+        self.button_frame = ButtonFrame(self.left_frame, self.file_explorer_tab)
+        self.button_frame.pack(fill="x") # Or pack as needed. Do NOT add to the notebook.
+
+
+        # self.button_frame = ButtonFrame(self.sidebar_tab, self.file_explorer_tab) # Pass the instance
+        # self.sidebar_tab.add(frame1)
+
+
+        
+        # file_explorer_label = tk.Label(frame1, text="File Explorer Content (Placeholder)")
+        # file_explorer_label.pack(padx=10, pady=10)
+        # self.sidebar_tab.add(frame1, text="File Explorer")
+
+
+
+    def create_chromatogram_tab(self, parent_frame):
+        # Create a vertical PanedWindow inside the parent_frame
+        self.chromatogram_paned_window = PanedWindow(parent_frame, orient=tk.VERTICAL)
+        self.chromatogram_paned_window.pack(fill="both", expand=True)
+        # Create upper and lower frames within the provided parent_frame
+        self.upper_right_frame = tk.Frame(self.chromatogram_paned_window, bg="white")
+        self.lower_right_frame = tk.Frame(self.chromatogram_paned_window, bg="white")
+
         # Add the frames to the PanedWindow
-        self.right_paned_window.add(self.upper_right_frame, minsize=200) # chromatogram plotly
-        self.right_paned_window.add(self.lower_right_frame, minsize=200) # mass spectrum plotly
-        # Set the sash position to make the frames equal height 50% each
-        self.right_frame.after(100, lambda: self.right_paned_window.sash_place(0, 0, self.right_frame.winfo_height() // 2))
+        self.chromatogram_paned_window.add(self.upper_right_frame, minsize=100)  # Upper frame (chromatogram)
+        self.chromatogram_paned_window.add(self.lower_right_frame, minsize=100)  # Lower frame (mass spectrum)
+        
+        # Add some example content to the frames
+        upper_label = tk.Label(self.upper_right_frame, 
+                               #text="Chromatogram Display", 
+                               bg="white")
+        upper_label.pack(padx=1, pady=1)
+
+        lower_label = tk.Label(self.lower_right_frame, 
+                               #text="Mass Spectrum Display", 
+                               bg="white")
+        lower_label.pack(padx=1, pady=1)
+
+        # Configure frame ratios and bind resize event
+        self.upper_frame_ratio = 1.5
+        self.lower_frame_ratio = 1.0
+        self.set_sash_position()  # Initial placement
+        parent_frame.bind("<Configure>", self.on_resize)  # Bind to resize event
 
 
- 
+    def set_sash_position(self): # set the sash position based on the desired ratio
+        total_height = self.chromatogram_paned_window.winfo_height()
+        if total_height <= 1: # Window not fully initialized yet
+            self.chromatogram_paned_window.after(50, self.set_sash_position)
+            return
+        ratio = self.upper_frame_ratio / (self.upper_frame_ratio + self.lower_frame_ratio)
+        sash_position = int(total_height * ratio)
+        sash_position = max(0, min(sash_position, total_height)) # Clamp
+        self.chromatogram_paned_window.sash_place(0, 0, sash_position)
 
 
-        # Add a label to the toolbar and statusbar
-        self.toolbar_label = tk.Label(self.toolbar, text="toolbar", font=("Arial", 8))
-        self.toolbar_label.pack(side="left", padx=1, pady=1)
-        self.statusbar = tk.Label(self.statusbar, text="statusbar", font=("Arial", 8))
-        self.statusbar.pack(side="left", padx=1, pady=1)
+    def on_resize(self, event):
+        self.set_sash_position()
 
+    
         # Add widgets here
         #self.label.pack(pady=20)
 
@@ -100,7 +189,17 @@ class MainWindow(tk.Frame):
         
         # self.plot_frame = tk.Frame(root)
         # self.plot_frame.pack(fill=tk.BOTH, expand=True)
-    
+    def open_raw_data_overview(self, tab="Raw data overview"):
+        # Check if tab with the name exists
+        for tab_id in self.plot_tab.tabs():
+            if self.plot_tab.tab(tab_id, "text") == tab:
+                self.plot_tab.select(tab_id) # Select the tab to make it visible
+                return # Exit to prevent creating another tab
+        # Tab doesn't exist, create it
+        self.raw_data_tab = tk.Frame(self.plot_tab)  # Create the frame
+        self.create_chromatogram_tab(self.raw_data_tab)  # Add content to the frame
+        self.plot_tab.add(self.raw_data_tab, text= tab)  # Add the tab
+        self.plot_tab.select(self.raw_data_tab)  # Select the new tab
 
 
     def new_file(self):
