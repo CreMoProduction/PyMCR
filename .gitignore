@@ -1,0 +1,17 @@
+# .gitignore
+__pycache__/
+venv/
+*.pyc
+research
+backup
+
+# Ignore all files
+
+
+# Except these files
+!.gitignore
+!README.md
+!requirements.txt
+
+# Don't ignore directories
+!*/
